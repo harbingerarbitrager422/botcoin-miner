@@ -63,9 +63,10 @@ cp .env.example .env
 
 1. Go to [bankr.bot/api](https://bankr.bot/api)
 2. Sign up / log in
-3. Enable **Agent API**
-4. Disable **read-only** mode (the miner needs to sign transactions)
-5. Copy your API key
+3. Enable the **Agent API** toggle
+4. Under Agent API, make sure the **Read Only** toggle is **off** (the miner needs write access to sign transactions, stake, and claim)
+5. Enable the **LLM Gateway** toggle (the miner routes all LLM calls through Bankr's gateway)
+6. Copy your API key
 
 #### 5. Configure `.env`
 
@@ -95,16 +96,26 @@ botcoin status
 The miner uses the Bankr LLM Gateway for inference. Each solve attempt costs LLM credits (~$0.01–0.05 with `gemini-2.5-flash`). Credits are purchased with **USDC from your Bankr wallet on Base**.
 
 **Add credits manually:**
-- **Dashboard**: [bankr.bot/llm?tab=credits](https://bankr.bot/llm?tab=credits)
-- **CLI**: `bankr llm credits add 25` (spends $25 USDC → $25 in LLM credits)
+
+1. Go to [bankr.bot/llm?tab=credits](https://bankr.bot/llm?tab=credits)
+2. Enter an amount (e.g. $25) and confirm — this spends USDC from your Bankr wallet on Base
+
+Or via CLI: `bankr llm credits add 25`
 
 **Auto top-up (recommended):**
-The setup wizard (`botcoin setup`) can enable automatic top-up. When your LLM credit balance drops below $5, Bankr will automatically spend $25 USDC from your wallet to buy more credits — so mining never stalls. This requires USDC on Base in your Bankr wallet.
 
-You can also configure this manually:
+You can enable automatic top-up so mining never stalls when credits run low:
+
+1. Go to [bankr.bot/llm?tab=credits](https://bankr.bot/llm?tab=credits)
+2. Enable **Auto Top-Up**
+3. Set a top-up amount (e.g. $25) and a threshold (e.g. $5) — when your balance drops below the threshold, Bankr will automatically buy more credits using USDC from your wallet
+
+Or via CLI:
 ```bash
 bankr llm credits auto --enable --amount 25 --threshold 5 --tokens USDC
 ```
+
+The setup wizard (`botcoin setup`) can also configure this for you interactively.
 
 #### 8. Stake BOTCOIN
 
