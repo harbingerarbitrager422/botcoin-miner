@@ -151,7 +151,8 @@ async def mining_loop(
                         or solves_since_credit_check >= CREDIT_CHECK_SOLVES):
                     try:
                         usage = await get_usage(llm, days=1)
-                        cost = usage.get("total_cost", usage.get("totalCost", "?"))
+                        totals = usage.get("totals", {})
+                        cost = totals.get("totalCost", usage.get("total_cost", usage.get("totalCost", "?")))
                         if display:
                             display.update_credits(f"${cost}")
                         _log(f"Usage (24h): ${cost}")

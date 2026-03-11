@@ -8,6 +8,7 @@ import json
 import logging
 import random
 import re as _re
+import time
 from typing import Any, Optional
 
 import httpx
@@ -15,10 +16,43 @@ import httpx
 logger = logging.getLogger(__name__)
 
 BANKR_LLM_BASE = "https://llm.bankr.bot"
+MAX_REQUESTS_PER_MINUTE = 45  # stay safely under the 60/min gateway limit
+
+
+class _RateLimiter:
+    """Sliding-window rate limiter for async contexts."""
+
+    def __init__(self, max_per_minute: int = MAX_REQUESTS_PER_MINUTE):
+        self._max = max_per_minute
+        self._timestamps: list[float] = []
+        self._lock: Optional[asyncio.Lock] = None
+
+    def _get_lock(self) -> asyncio.Lock:
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
+
+    async def acquire(self) -> None:
+        lock = self._get_lock()
+        while True:
+            async with lock:
+                now = time.monotonic()
+                # Prune timestamps older than 60s
+                self._timestamps = [t for t in self._timestamps if now - t < 60]
+                if len(self._timestamps) < self._max:
+                    self._timestamps.append(now)
+                    return
+                # Wait until the oldest timestamp expires
+                wait = 60 - (now - self._timestamps[0]) + 0.1
+            await asyncio.sleep(wait)
 
 
 class InsufficientCreditsError(Exception):
     """Raised when LLM gateway returns 402 / payment required."""
+
+
+class RateLimitError(Exception):
+    """Raised when LLM gateway returns 429 / too many requests."""
 
 
 class LLMClient:
@@ -45,18 +79,19 @@ class LLMClient:
                 "Content-Type": "application/json",
             },
             limits=httpx.Limits(
-                max_connections=40,
-                max_keepalive_connections=35,
+                max_connections=10,
+                max_keepalive_connections=8,
             ),
         )
         self._semaphore: Optional[asyncio.Semaphore] = None
+        self._rate_limiter = _RateLimiter()
 
     async def close(self) -> None:
         await self._client.aclose()
 
     def _get_semaphore(self) -> asyncio.Semaphore:
         if self._semaphore is None:
-            self._semaphore = asyncio.Semaphore(30)
+            self._semaphore = asyncio.Semaphore(5)
         return self._semaphore
 
     def _pydantic_to_json_schema(self, model_class: Any) -> dict:
@@ -148,6 +183,7 @@ class LLMClient:
         sem = self._get_semaphore()
         async with sem:
             for attempt in range(max_retries):
+                await self._rate_limiter.acquire()
                 try:
                     response = await self._call_gateway(
                         model, messages, json_schema, temperature, max_tokens, timeout,
@@ -156,6 +192,15 @@ class LLMClient:
                         return response
                 except InsufficientCreditsError:
                     raise
+                except RateLimitError as e:
+                    logger.warning(f"LLM attempt {attempt + 1}/{max_retries} rate limited: {e}")
+                    if attempt < max_retries - 1:
+                        delay = 10 * (2 ** attempt) + random.uniform(1, 5)
+                        logger.info(f"Rate limited, backing off {delay:.0f}s...")
+                        await asyncio.sleep(delay)
+                    else:
+                        logger.error("All LLM retry attempts failed (rate limited)")
+                    continue
                 except Exception as e:
                     logger.warning(f"LLM attempt {attempt + 1}/{max_retries} failed: {e}")
 
@@ -192,6 +237,11 @@ class LLMClient:
         if response.status_code == 402:
             raise InsufficientCreditsError(
                 f"Insufficient LLM credits: {response.text[:300]}"
+            )
+
+        if response.status_code == 429:
+            raise RateLimitError(
+                f"LLM gateway 429: {response.text[:500]}"
             )
 
         if response.status_code != 200:
