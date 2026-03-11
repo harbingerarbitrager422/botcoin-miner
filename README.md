@@ -14,7 +14,7 @@ Open-source BOTCOIN mining CLI for Base. Solves hybrid NLP challenges using LLM-
 ### Quick Start (Interactive Wizard)
 
 ```bash
-git clone <repo-url> && cd botcoin_pub
+git clone https://github.com/harbingerarbitrager422/botcoin-miner && cd botcoin_pub
 uv venv && source .venv/bin/activate
 uv pip install -e .
 botcoin setup
