@@ -268,3 +268,7 @@ src/
 ├── shutdown.py            # Graceful shutdown
 └── types.py               # Pydantic API models
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE).

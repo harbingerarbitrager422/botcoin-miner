@@ -2,6 +2,7 @@
 name = "botcoin"
 version = "1.0.0"
 description = "BOTCOIN Miner CLI"
+license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "httpx>=0.27",
