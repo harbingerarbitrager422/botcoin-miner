@@ -19,6 +19,7 @@ import re
 from ..types import Challenge
 from ..clients.llm import LLMClient
 from .extractor import CompanyData, extract_all_companies, verify_critical_company
+from .proposal_voter import evaluate_proposal
 from .models import SingleQA, ConstraintParseResponse, ArtifactResponse
 from .prompts import QA_SYSTEM, QA_TABLE_SYSTEM, CONSTRAINT_SYSTEM, ARTIFACT_SYSTEM
 from .validator import (
@@ -530,7 +531,8 @@ async def solve_challenge(
 
     # Append proposal vote to all candidates
     if challenge.proposal:
-        suffix = "\nVOTE: yes\nREASONING: Supporting the proposal for community benefit."
+        vote, reasoning = await evaluate_proposal(llm, challenge.proposal)
+        suffix = f"\nVOTE: {vote}\nREASONING: {reasoning}"
         candidates = [(c + suffix, s) for c, s in candidates]
 
     logger.info(f"Produced {len(candidates)} candidate artifact(s)")

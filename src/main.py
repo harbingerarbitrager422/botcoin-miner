@@ -151,6 +151,7 @@ async def cmd_claim(args, config):
 async def cmd_status(args, config):
     from .clients.coordinator import CoordinatorClient
     from .clients.bankr import BankrClient
+    from .staking.stake_info import get_stake_info
 
     coordinator = CoordinatorClient(config.coordinator_url)
     bankr = BankrClient(config.bankr_api)
@@ -168,6 +169,13 @@ async def cmd_status(args, config):
 
         credits = await coordinator.get_credits(miner)
         print(f"Credits: {credits}")
+
+        try:
+            stake_info = await get_stake_info(miner)
+            print(f"\n--- Stake Info (on-chain) ---")
+            print(stake_info.display())
+        except Exception as e:
+            logger.warning(f"Failed to fetch stake info: {e}")
     finally:
         await coordinator.close()
         await bankr.close()
